@@ -1,0 +1,58 @@
+import pandas as pd
+import pickle
+import config
+class DataPreprocessor:
+    def __init__(self):
+        self.config = config
+        self.tenure_mean = None
+        self.__load_dependency()
+    def __validation(self,dataset):
+        pass
+
+    def __load_dependency(self):
+
+        # Load dummy column structure for Contract
+        with open(self.config.dummy_contract_columns, 'rb') as f:
+            self.dummy_columns = pickle.load(f)
+        
+    def fit(self, dataset):
+        self.tenure_mean = dataset['tenure'].mean()
+        return self
+    
+    def clean_total_charges(self,data):
+
+        data['TotalCharges'] = data['TotalCharges'].fillna(2279)
+        data['TotalCharges'] = data['TotalCharges'].str.replace(' ', '2279')
+        data['TotalCharges'] = data['TotalCharges'].astype(float)
+        return data
+
+    def transform(self, dataset):
+        data = dataset.copy()
+        # Nulls:
+        data = self.clean_total_charges(data)  
+        # Contract validation
+        if data['Contract'].isnull().any():
+            raise ValueError("Contract cannot be null - model will not predict")
+        
+        data['PhoneService'] = data['PhoneService'].fillna('No')
+        data['tenure'] = data['tenure'].fillna(self.tenure_mean)
+        
+        # Feature handling:
+        data['PhoneService'] = data['PhoneService'].map({'Yes':1,'No':0})
+        # One-hot encode 'Contract'
+        contract_dummies = pd.get_dummies(data['Contract']).astype(int)
+
+        # Ensure all expected dummy columns exist
+        for col in self.dummy_columns:
+            if col not in contract_dummies:
+                contract_dummies[col] = 0
+
+        # Order columns and join
+        contract_dummies = contract_dummies[self.dummy_columns]
+        data = data.join(contract_dummies)
+
+        # Return only model input columns
+        return data[self.config.MODEL_COLUMNS]
+        
+    def fit_transform(self, dataset):
+        return self.fit(dataset).transform(dataset)
