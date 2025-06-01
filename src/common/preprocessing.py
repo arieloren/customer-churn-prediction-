@@ -19,12 +19,23 @@ class DataPreprocessor:
         self.tenure_mean = dataset['tenure'].mean()
         return self
     
-    def clean_total_charges(self,data):
-
+    def clean_total_charges(self, data):
         data['TotalCharges'] = data['TotalCharges'].fillna(2279)
-        data['TotalCharges'] = data['TotalCharges'].str.replace(' ', '2279')
+        
+        # ✅ Ensure string type before using .str methods
+        data['TotalCharges'] = data['TotalCharges'].astype(str).str.replace(' ', '2279')
+
+        # ✅ Convert back to float after cleaning
         data['TotalCharges'] = data['TotalCharges'].astype(float)
+        
         return data
+    
+    # def clean_total_charges(self,data):
+
+    #     data['TotalCharges'] = data['TotalCharges'].fillna(2279)
+    #     data['TotalCharges'] = data['TotalCharges'].str.replace(' ', '2279')
+    #     data['TotalCharges'] = data['TotalCharges'].astype(float)
+    #     return data
 
     def transform(self, dataset):
         data = dataset.copy()

@@ -14,6 +14,10 @@ class TransformModel():
         with open(self.config.MODEL_PATH, 'rb') as f:
             self.model: RandomForestClassifier = pickle.load(f)
 
+    def predict_proba(self, dataset):
+        dataset = dataset.loc[:, self.model.feature_names_in_]
+        return self.model.predict_proba(dataset)
+
     def predict(self, dataset):
         self.__validation(dataset)
         # Enforce column order and names from the trained model
