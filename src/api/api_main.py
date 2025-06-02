@@ -5,9 +5,11 @@ import pandas as pd
 from request_schema import CustomerChurnRequestSchema
 from src.common.preprocessing import DataPreprocessor
 from src.common.model_loader import TransformModel
-import config
+from config.config_loader import Config
 
 app = Flask(__name__)
+# Load configuration
+config = Config()
 
 # Instantiate components
 schema = CustomerChurnRequestSchema()
@@ -29,7 +31,7 @@ def predict():
     preprocessor.fit(df) 
     processed = preprocessor.transform(df)
     prob = model.predict_proba(processed)[0][1]  # Get probability of class=1
-    prediction = int(prob >= config.THRESHOLD)   # Use threshold to determine 0/1
+    prediction = int(prob >= config.get_threshold())   # Use threshold to determine 0/1
 
     return jsonify({
         "prediction": prediction,

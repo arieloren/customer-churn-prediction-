@@ -11,7 +11,7 @@ class TransformModel():
         pass
 
     def __load_dependency(self):
-        with open(self.config.MODEL_PATH, 'rb') as f:
+        with open(self.config.get_model_path(), 'rb') as f:
             self.model: RandomForestClassifier = pickle.load(f)
 
     def predict_proba(self, dataset):

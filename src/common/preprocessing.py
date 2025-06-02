@@ -1,9 +1,9 @@
 import pandas as pd
 import pickle
-import config
+from config.config_loader import Config
 class DataPreprocessor:
     def __init__(self):
-        self.config = config
+        self.config = Config()
         self.tenure_mean = None
         self.__load_dependency()
     def __validation(self,dataset):
@@ -12,7 +12,7 @@ class DataPreprocessor:
     def __load_dependency(self):
 
         # Load dummy column structure for Contract
-        with open(self.config.dummy_contract_columns, 'rb') as f:
+        with open(self.config.get_dummy_columns_path(), 'rb') as f:
             self.dummy_columns = pickle.load(f)
         
     def fit(self, dataset):
@@ -30,13 +30,6 @@ class DataPreprocessor:
         
         return data
     
-    # def clean_total_charges(self,data):
-
-    #     data['TotalCharges'] = data['TotalCharges'].fillna(2279)
-    #     data['TotalCharges'] = data['TotalCharges'].str.replace(' ', '2279')
-    #     data['TotalCharges'] = data['TotalCharges'].astype(float)
-    #     return data
-
     def transform(self, dataset):
         data = dataset.copy()
         # Nulls:
@@ -63,7 +56,7 @@ class DataPreprocessor:
         data = data.join(contract_dummies)
 
         # Return only model input columns
-        return data[self.config.MODEL_COLUMNS]
+        return data[self.config.get_model_columns()]
         
     def fit_transform(self, dataset):
         return self.fit(dataset).transform(dataset)

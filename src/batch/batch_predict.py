@@ -5,10 +5,13 @@ import pandas as pd
 from src.common.extract import ExtractFile
 from src.common.preprocessing import DataPreprocessor
 from src.common.model_loader import TransformModel
-import config
+from config.config_loader import Config
+
 
 
 def main(input_file):
+    # Load config from YAML
+    config = Config()
     # 1. Load data
     extractor = ExtractFile(input_file)
     raw_data = extractor.load_data()
@@ -17,8 +20,6 @@ def main(input_file):
     preprocessor = DataPreprocessor()
     preprocessor.fit(raw_data)  # only needed if you're recalculating mean, optional in prod
     processed_data = preprocessor.transform(raw_data)
-    print(processed_data.columns.tolist())
-    print(config.MODEL_COLUMNS)
 
     # 3. Load model and predict
     model = TransformModel(config)

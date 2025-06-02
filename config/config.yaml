@@ -1,0 +1,7 @@
+model:
+  path: data/model/churn_model.pickle
+  threshold: 0.5
+  columns: ['TotalCharges', 'tenure', 'PhoneService', 'Month-to-month', 'One year', 'Two year']
+
+preprocessing:
+  dummy_contract_columns: data/dummy_columns.pkl
