@@ -1,0 +1,96 @@
+version: "3.9"
+
+services:
+  # ----------------------------
+  # Postgres - main application DB
+  # ----------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: churn-db
+    environment:
+      POSTGRES_USER: churn
+      POSTGRES_PASSWORD: churn_pwd
+      POSTGRES_DB: churn_db
+    ports:
+      - "5432:5432"        # optional – expose for psql / DBeaver
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------
+  # REST API (Flask) – churn predictions
+  # ----------------------------
+  churn-api:
+    build:
+      context: .
+      dockerfile: src/api/Dockerfile-api   # points to the API Dockerfile you created
+    container_name: churn-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Inject DB URI for SQL-alchemy or psycopg2 if you connect later
+      DB_URI: postgresql://churn:churn_pwd@db:5432/churn_db
+      PYTHONUNBUFFERED: "1"    # nicer logs
+    ports:
+      - "9999:9999"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9999/predict"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------
+  # Batch runner – daily job image
+  # (no ports, executed on-demand or via scheduled GitHub Action)
+  # ----------------------------
+  batch-runner:
+    build:
+      context: .
+      dockerfile: src/batch/Dockerfile-batch
+    volumes:
+      - ./data:/app/data
+      - ./outputs:/app/outputs
+    container_name: churn-batch
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URI: postgresql://churn:churn_pwd@db:5432/churn_db
+    # no automatic run when compose starts; you’ll launch with:
+    #   docker compose run --rm batch-runner
+    entrypoint: []   # keep CMD from Dockerfile
+
+  # ----------------------------
+  # Prometheus – metrics scraper
+  # ----------------------------
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - churn-api      # scrape API metrics
+
+  # ----------------------------
+  # Grafana – dashboard frontend
+  # ----------------------------
+  grafana:
+    image: grafana/grafana-oss:11.0.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  pgdata:
+  grafana-data:
