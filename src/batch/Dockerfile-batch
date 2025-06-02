@@ -1,0 +1,19 @@
+FROM python:3.11-slim
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Set PYTHONPATH so 'src' is recognized as a package
+ENV PYTHONPATH="${PYTHONPATH}:/app"
+
+
+COPY src/ src/
+COPY config/ config/
+COPY data/model/ data/model/
+
+# 🔧 Create output folder
+RUN mkdir -p outputs
+
+# Entry point
+CMD ["python", "src/batch/batch_predict.py", "data/database_input.csv"]
