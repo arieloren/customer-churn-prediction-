@@ -1,0 +1,38 @@
+# This workflow runs a nightly batch job to generate predictions.
+name: Daily nightly batch (00:00 Israel)
+
+on:
+  # ────────────────────────────────────────────────────────────────────────────
+  #  0 10 * * *  →  10:00 UTC  →  00:00 Israel Standard / 01:00 IDT
+  # ────────────────────────────────────────────────────────────────────────────
+  schedule:
+    - cron: '0 10 * * *'
+
+  # Optional – lets you launch it by hand from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  nightly-batch:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1 ️⃣  Grab the repo
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v4
+
+      # 2 ️⃣  (Re-)build the images referenced by docker-compose
+      - name: 🐳 docker compose build
+        run: docker compose -f docker-compose.yml build batch-runner
+
+      # 3 ️⃣  Run the batch job
+      - name: 🚀 Execute batch-runner
+        run: docker compose -f docker-compose.yml run --rm batch-runner
+
+      # 4 ️⃣  Keep the CSVs (optional)
+      - name: 📦 Upload predictions artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: batch-predictions-${{ github.run_number }}
+          path: outputs/*.csv
+          if-no-files-found: warn
