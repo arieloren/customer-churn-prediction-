@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from marshmallow import ValidationError
 import pandas as pd
 
-from request_schema import CustomerChurnRequestSchema
+from src.api.request_schema import CustomerChurnRequestSchema
 from src.common.preprocessing import DataPreprocessor
 from src.common.model_loader import TransformModel
 from config.config_loader import Config
@@ -13,7 +13,7 @@ config = Config()
 
 # Instantiate components
 schema = CustomerChurnRequestSchema()
-preprocessor = DataPreprocessor()
+preprocessor = DataPreprocessor(config)
 model = TransformModel(config)
 
 @app.route('/predict', methods=['POST'])

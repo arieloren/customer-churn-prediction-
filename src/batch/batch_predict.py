@@ -17,7 +17,8 @@ def main(input_file):
     raw_data = extractor.load_data()
 
     # 2. Preprocess
-    preprocessor = DataPreprocessor()
+    cfg = Config()
+    preprocessor = DataPreprocessor(cfg)
     preprocessor.fit(raw_data)  # only needed if you're recalculating mean, optional in prod
     processed_data = preprocessor.transform(raw_data)
 

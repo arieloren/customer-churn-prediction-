@@ -2,8 +2,8 @@ import pandas as pd
 import pickle
 from config.config_loader import Config
 class DataPreprocessor:
-    def __init__(self):
-        self.config = Config()
+    def __init__(self, config: Config):
+        self.config = config
         self.tenure_mean = None
         self.__load_dependency()
     def __validation(self,dataset):
@@ -23,7 +23,7 @@ class DataPreprocessor:
         data['TotalCharges'] = data['TotalCharges'].fillna(2279)
         
         # ✅ Ensure string type before using .str methods
-        data['TotalCharges'] = data['TotalCharges'].astype(str).str.replace(' ', '2279')
+        data['TotalCharges'] = data['TotalCharges'].astype(str).replace(r'^\s*$', '2279', regex=True)
 
         # ✅ Convert back to float after cleaning
         data['TotalCharges'] = data['TotalCharges'].astype(float)
