@@ -41,15 +41,15 @@ jobs:
           pip install -r requirements.txt
           sudo apt-get update && sudo apt-get install -y postgresql-client  # pg_isready
       - name: ⏱ Wait for Postgres & export env-vars
-              run: |
-                for i in {1..15}; do
-                  pg_isready -h postgres -p 5432 -U churn && break
-                  sleep 2
-                done
-                echo "PGHOST=postgres"      >> $GITHUB_ENV
-                echo "PGUSER=churn"         >> $GITHUB_ENV
-                echo "PGPASSWORD=churn_pwd" >> $GITHUB_ENV
-                echo "PGDATABASE=churn_db"  >> $GITHUB_ENV
+        run: |
+          for i in {1..15}; do
+            pg_isready -h postgres -p 5432 -U churn && break
+            sleep 2
+          done
+          echo "PGHOST=postgres"      >> $GITHUB_ENV
+          echo "PGUSER=churn"         >> $GITHUB_ENV
+          echo "PGPASSWORD=churn_pwd" >> $GITHUB_ENV
+          echo "PGDATABASE=churn_db"  >> $GITHUB_ENV
       - name: ✅ Run pytest
         run: pytest -q
 
