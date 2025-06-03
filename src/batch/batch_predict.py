@@ -3,7 +3,7 @@ from src.common.db import get_conn
 from src.common.preprocessing import DataPreprocessor
 from src.common.model_loader import TransformModel
 from config.config_loader import Config
-
+import sys
 
 def fetch_input_data():
     """Fetch data from Postgres that needs predictions."""
@@ -34,6 +34,9 @@ def main():
 
     # 1. Load data from DB
     raw_data = fetch_input_data()
+    if raw_data.empty:
+        print("ℹ️ No new raw rows – nothing to predict today")
+        sys.exit(0)          # graceful exit, job marked as success
 
     # 2. Preprocess
     preprocessor = DataPreprocessor(config)
