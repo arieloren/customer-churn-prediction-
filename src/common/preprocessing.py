@@ -1,14 +1,18 @@
 import pandas as pd
 import pickle
 from config.config_loader import Config
+import logging
 class DataPreprocessor:
     def __init__(self, config: Config):
         self.config = config
         self.tenure_mean = None
         self.__load_dependency()
     def __validation(self,dataset):
-        pass
-
+        empty_rows = dataset.isnull().any(axis=1)
+        if not empty_rows.empty:
+            logging.warning(f"❌ Skipping {len(empty_rows)} completely empty row(s).")
+            dataset.dropna(how='all', inplace=True)
+        return dataset
     def __load_dependency(self):
 
         # Load dummy column structure for Contract
@@ -32,6 +36,8 @@ class DataPreprocessor:
     
     def transform(self, dataset):
         data = dataset.copy()
+        # Validation pre-clean
+        data = self.__validation(data)
         # Nulls:
         data = self.clean_total_charges(data)  
         # Contract validation
