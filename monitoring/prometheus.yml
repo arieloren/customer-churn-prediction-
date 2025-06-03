@@ -5,3 +5,9 @@ scrape_configs:
   - job_name: "churn-api"
     static_configs:
       - targets: ["churn-api:9999"]
+
+  # ── scrape the Pushgateway for batch metrics ────────────────
+  - job_name: churn_batch
+    honor_labels: true
+    static_configs:
+      - targets: ['pushgateway:9091']

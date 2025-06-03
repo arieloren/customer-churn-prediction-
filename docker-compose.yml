@@ -64,9 +64,18 @@ services:
         condition: service_healthy
     environment:
       DB_URI: postgresql://churn:churn_pwd@db:5432/churn_db
+      USHGATEWAY_URL: pushgateway:9091 # Pushgateway URL for metrics
     # no automatic run when compose starts; you’ll launch with:
     #   docker compose run --rm batch-runner
     entrypoint: []   # keep CMD from Dockerfile
+
+  # ------------------------------------------------------------------
+  #   Prometheus Pushgateway
+  # ------------------------------------------------------------------
+  pushgateway:
+    image: prom/pushgateway:v1.8.0
+    container_name: pushgateway
+    ports: ["9091:9091"]
 
   # ----------------------------
   # Prometheus – metrics scraper
