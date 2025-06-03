@@ -5,38 +5,81 @@ import pandas as pd
 from src.api.request_schema import CustomerChurnRequestSchema
 from src.common.preprocessing import DataPreprocessor
 from src.common.model_loader import TransformModel
+from src.common.db import get_conn
 from config.config_loader import Config
 
+# ────────────────────  Prometheus  ────────────────────
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+
+REQUEST_COUNT = Counter(
+    "api_requests_total",
+    "Total prediction requests",
+    ["endpoint", "http_status"],
+)
+
+PREDICT_LATENCY = Histogram(
+    "api_predict_seconds",
+    "Time spent in /predict handler",
+)
+# ───────────────────────────────────────────────────────
+
 app = Flask(__name__)
-# Load configuration
 config = Config()
 
-# Instantiate components
-schema = CustomerChurnRequestSchema()
+schema       = CustomerChurnRequestSchema()
 preprocessor = DataPreprocessor(config)
-model = TransformModel(config)
+model        = TransformModel(config)
 
-@app.route('/predict', methods=['POST'])
+
+# Prometheus scrape target
+@app.route("/metrics")
+def metrics():
+    return generate_latest(), 200, {"Content-Type": CONTENT_TYPE_LATEST}
+
+
+# Main prediction endpoint
+@app.route("/predict", methods=["POST"])
+@PREDICT_LATENCY.time()
 def predict():
+    status_code = 200
+
+    # 1️⃣  Validate JSON
     try:
-        request_data = request.get_json()
-        validated_data = schema.load(request_data)
+        req_json       = request.get_json()
+        validated_data = schema.load(req_json)
     except ValidationError as err:
-        return jsonify({"error": err.messages}), 400
+        status_code = 400
+        REQUEST_COUNT.labels("/predict", str(status_code)).inc()
+        return jsonify({"error": err.messages}), status_code
 
-    # Convert to DataFrame for processing
-    df = pd.DataFrame([validated_data])
+    # 2️⃣  Pre-process & model inference
+    try:
+        df         = pd.DataFrame([validated_data])
+        preprocessor.fit(df)
+        processed  = preprocessor.transform(df)
 
-    # Preprocess + Predict
-    preprocessor.fit(df) 
-    processed = preprocessor.transform(df)
-    prob = model.predict_proba(processed)[0][1]  # Get probability of class=1
-    prediction = int(prob >= config.get_threshold())   # Use threshold to determine 0/1
+        prob       = model.predict_proba(processed)[0, 1]
+        prediction = int(prob >= config.get_threshold())
 
-    return jsonify({
-        "prediction": prediction,
-        "probability": round(prob, 3)
-    }), 200
+        # 3️⃣  Persist
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO churn_predictions (customer_id, churn, probability)
+                VALUES (%s,%s,%s)
+                """,
+                (validated_data["customerID"], prediction, round(prob, 3)),
+            )
 
-if __name__ == '__main__':
+    except Exception as e:
+        status_code = 500
+        REQUEST_COUNT.labels("/predict", str(status_code)).inc()
+        return jsonify({"error": f"internal error: {e}"}), status_code
+
+    # 4️⃣  Success
+    REQUEST_COUNT.labels("/predict", str(status_code)).inc()
+    return jsonify({"prediction": prediction, "probability": round(prob, 3)}), status_code
+
+
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=9999, debug=True)
