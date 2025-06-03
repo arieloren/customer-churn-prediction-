@@ -1,48 +1,52 @@
-import sys
-import os
 import pandas as pd
-
-from src.common.extract import ExtractFile
+from src.common.db import get_conn
 from src.common.preprocessing import DataPreprocessor
 from src.common.model_loader import TransformModel
 from config.config_loader import Config
 
 
+def fetch_input_data():
+    """Fetch data from Postgres that needs predictions."""
+    query = "SELECT customer_id, tenure, TotalCharges, Contract, PhoneService FROM raw_inputs;"
+    with get_conn() as conn:
+        return pd.read_sql_query(query, conn)
 
-def main(input_file):
-    # Load config from YAML
+
+def insert_predictions(df: pd.DataFrame):
+    """Insert predictions into churn_predictions table."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.executemany(
+                """
+                INSERT INTO churn_predictions (customer_id, churn, probability)
+                VALUES (%s, %s, %s)
+                """,
+                df[["customerID", "Prediction", "probability"]].values.tolist()
+            )
+    print("✅ Predictions saved to Postgres (churn_predictions)")
+
+
+def main():
     config = Config()
-    # 1. Load data
-    extractor = ExtractFile(input_file)
-    raw_data = extractor.load_data()
+
+    # 1. Load data from DB
+    raw_data = fetch_input_data()
 
     # 2. Preprocess
-    cfg = Config()
-    preprocessor = DataPreprocessor(cfg)
-    preprocessor.fit(raw_data)  # only needed if you're recalculating mean, optional in prod
+    preprocessor = DataPreprocessor(config)
+    preprocessor.fit(raw_data)
     processed_data = preprocessor.transform(raw_data)
 
-    # 3. Load model and predict
+    # 3. Predict
     model = TransformModel(config)
     predictions = model.predict(processed_data)
+    probabilities = model.predict_proba(processed_data)[:, 1]
 
-    # 4. Output result
-    output = raw_data.copy()
-    output['Prediction'] = predictions
-    print(output[['Prediction']].head())  # preview
-    output.to_csv("outputs/predictions.csv", index=False)
-    print("✅ Predictions saved to outputs/predictions.csv")
+    # 4. Prepare output and write to DB
+    raw_data['Prediction'] = predictions
+    raw_data['probability'] = probabilities
+    insert_predictions(raw_data)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("❌ Please provide the path to the input CSV file.")
-        print("Usage: python batch_predict.py data/database_input.csv")
-        sys.exit(1)
-
-    input_path = sys.argv[1]
-    if not os.path.exists(input_path):
-        print(f"❌ File not found: {input_path}")
-        sys.exit(1)
-
-    main(input_path)
+    main()
