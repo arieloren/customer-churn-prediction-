@@ -1,0 +1,42 @@
+{
+    "id": null,
+    "title": "Churn-App Overview",
+    "panels": [
+      {
+        "type": "graph",
+        "title": "API Requests / sec",
+        "targets": [
+          {
+            "expr": "rate(api_requests_total[1m])",
+            "legendFormat": "{{http_status}}"
+          }
+        ],
+        "datasource": "Prometheus"
+      },
+      {
+        "type": "graph",
+        "title": "Predict Latency (95th pct)",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(api_predict_seconds_bucket[5m])) by (le))",
+            "legendFormat": "p95"
+          }
+        ],
+        "datasource": "Prometheus"
+      },
+      {
+        "type": "stat",
+        "title": "Rows Written (last run)",
+        "targets": [
+          {
+            "expr": "batch_rows_written",
+            "legendFormat": "rows"
+          }
+        ],
+        "datasource": "Prometheus"
+      }
+    ],
+    "schemaVersion": 39,
+    "version": 1
+  }
+  
