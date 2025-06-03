@@ -26,9 +26,10 @@ services:
   # REST API (Flask) – churn predictions
   # ----------------------------
   churn-api:
+    image: arieloren/churn-api:latest  
     build:
       context: .
-      dockerfile: src/api/Dockerfile-api   # points to the API Dockerfile you created
+      dockerfile: src/api/Dockerfile-api
     container_name: churn-api
     depends_on:
       db:
@@ -50,6 +51,7 @@ services:
   # (no ports, executed on-demand or via scheduled GitHub Action)
   # ----------------------------
   batch-runner:
+    image: arieloren/churn-batch:latest   
     build:
       context: .
       dockerfile: src/batch/Dockerfile-batch
