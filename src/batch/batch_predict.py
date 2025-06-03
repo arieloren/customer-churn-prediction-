@@ -7,7 +7,10 @@ from config.config_loader import Config
 
 def fetch_input_data():
     """Fetch data from Postgres that needs predictions."""
-    query = "SELECT customer_id, tenure, TotalCharges, Contract, PhoneService FROM raw_inputs;"
+    query = """
+        SELECT customerID, tenure, "TotalCharges", "Contract", "PhoneService"
+        FROM churn_input_data;
+    """
     with get_conn() as conn:
         return pd.read_sql_query(query, conn)
 
