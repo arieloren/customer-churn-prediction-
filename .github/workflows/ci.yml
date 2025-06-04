@@ -42,15 +42,14 @@ jobs:
           sudo apt-get update && sudo apt-get install -y postgresql-client  # pg_isready
       - name: ⏱ Wait for Postgres & export env-vars
         run: |
-          for i in {1..15}; do
-            pg_isready -h postgres -p 5432 -U churn && break
-            sleep 2
-          done
-          # make vars available to the Python code 🐍
-          echo "PGHOST=postgres"      >> $GITHUB_ENV
-          echo "PGUSER=churn"         >> $GITHUB_ENV
-          echo "PGPASSWORD=churn_pwd" >> $GITHUB_ENV
-          echo "PGDATABASE=churn_db"  >> $GITHUB_ENV
+            for i in {1..15}; do
+              pg_isready -h 127.0.0.1 -p 5432 -U churn && break
+              sleep 2
+            done
+            echo "PGHOST=127.0.0.1"      >> $GITHUB_ENV
+            echo "PGUSER=churn"          >> $GITHUB_ENV
+            echo "PGPASSWORD=churn_pwd"  >> $GITHUB_ENV
+            echo "PGDATABASE=churn_db"   >> $GITHUB_ENV
       # NEW – execute the SQL that creates churn_predictions & churn_input_data
       - name:  Run DB migration
         run: |
