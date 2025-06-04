@@ -7,12 +7,13 @@ class DataPreprocessor:
         self.config = config
         self.tenure_mean = None
         self.__load_dependency()
-    def __validation(self,dataset):
-        empty_rows = dataset.isnull().any(axis=1)
-        if not empty_rows.empty:
-            logging.warning(f"❌ Skipping {len(empty_rows)} completely empty row(s).")
-            dataset.dropna(how='all', inplace=True)
-        return dataset
+    def __validation(self, dataset):
+            # Check for completely empty rows (all values are null)
+            empty_rows = dataset.isnull().all(axis=1)
+            if empty_rows.any():
+                logging.warning(f"❌ Skipping {empty_rows.sum()} completely empty row(s).")
+                dataset = dataset[~empty_rows]  # Filter out empty rows
+            return dataset
     def __load_dependency(self):
 
         # Load dummy column structure for Contract
