@@ -7,16 +7,25 @@ class DataPreprocessor:
         self.config = config
         self.tenure_mean = None
         self.__load_dependency()
-    def __validation(self, dataset: pd.DataFrame) -> pd.DataFrame:
-        """Drop rows that are truly empty (every cell null or blank)."""
-        empty_mask = dataset.apply(                # row is empty if …
-            lambda r: r.isna().all()               #   – all null   …or…
-                    or (r.astype(str).str.strip() == "").all(),
-            axis=1
-        )
+        
+    def __validation(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Drop rows that contain *no information whatsoever*:
+        every cell is either NaN or an empty-string/blank.
+        """
+        def _blank_to_nan(x):
+            if isinstance(x, str) and x.strip() == "":
+                return np.nan
+            return x
+
+        cleaned   = df.applymap(_blank_to_nan)
+        empty_mask = cleaned.isna().all(axis=1)   # True ⇢ row has 0 signals
+
         if empty_mask.any():
-            logging.warning(f"❌ Skipping {empty_mask.sum()} empty row(s).")
-        return dataset[~empty_mask]                # keep everything else
+            logging.warning(f"❌ Skipping {empty_mask.sum()} completely empty row(s).")
+
+        return df.loc[~empty_mask].copy()
+
 
     def __load_dependency(self):
 
