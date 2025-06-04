@@ -1,14 +1,14 @@
 name: CI
 
 on:
-  push:              # run on every push
+  push:
     branches: ["**"]
-  pull_request:      # and on every PR
+  pull_request:
 
-# ─────────────────────────────────────────────────────────────
 jobs:
-  # 1️⃣  unit tests + “does it build?” check
-  # ----------------------------------------------------------
+# ─────────────────────────────────────────────────────────────
+# 1️⃣  unit-tests  +  “does it build?”
+# ─────────────────────────────────────────────────────────────
   test-and-build:
     runs-on: ubuntu-latest
 
@@ -39,42 +39,43 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          sudo apt-get update && sudo apt-get install -y postgresql-client  # pg_isready
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+
       - name: ⏱ Wait for Postgres & export env-vars
         run: |
-            for i in {1..15}; do
-              pg_isready -h 127.0.0.1 -p 5432 -U churn && break
-              sleep 2
-            done
-            echo "PGHOST=127.0.0.1"      >> $GITHUB_ENV
-            echo "PGUSER=churn"          >> $GITHUB_ENV
-            echo "PGPASSWORD=churn_pwd"  >> $GITHUB_ENV
-            echo "PGDATABASE=churn_db"   >> $GITHUB_ENV
-      # NEW – execute the SQL that creates churn_predictions & churn_input_data
-      - name:  Run DB migration
+          for i in {1..15}; do
+            pg_isready -h 127.0.0.1 -p 5432 -U churn && break
+            sleep 2
+          done
+          {
+            echo "PGHOST=127.0.0.1"
+            echo "PGUSER=churn"
+            echo "PGPASSWORD=churn_pwd"
+            echo "PGDATABASE=churn_db"
+          } >> "$GITHUB_ENV"
+
+      - name: 🗄️ Run DB migration
         run: |
           psql -h 127.0.0.1 -U churn -d churn_db -f migrations/0001_init.sql
-        env:                          # psql also needs the password
+        env:
           PGPASSWORD: churn_pwd
-              
+
       - name: ✅ Run pytest
         run: pytest -q
 
       - name: 🐳 docker-compose build (compile only)
         run: docker compose -f docker-compose.yml build
 
-
-  # 2️⃣  build + push images to Docker Hub  (runs **only if** tests pass)
-  # ----------------------------------------------------------
+# ─────────────────────────────────────────────────────────────
+# 2️⃣  Push release images  (only if tests succeed)
+# ─────────────────────────────────────────────────────────────
   push-images:
-    needs: test-and-build         # ← wait for previous job
+    needs: test-and-build
     runs-on: ubuntu-latest
 
     steps:
-      - name: ⬇️ Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # build images WITH the tags defined in docker-compose.yml
       - name: 🐳 Build release images
         run: docker compose -f docker-compose.yml build churn-api batch-runner
 
