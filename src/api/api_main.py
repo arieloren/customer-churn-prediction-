@@ -41,18 +41,15 @@ def metrics():
 @app.route("/predict", methods=["POST"])
 @PREDICT_LATENCY.time()
 def predict():
-    status_code = 200
-
     # 1️⃣  Validate JSON
     try:
         req_json       = request.get_json()
         validated_data = schema.load(req_json)
     except ValidationError as err:
-        status_code = 400
-        REQUEST_COUNT.labels("/predict", str(status_code)).inc()
-        return jsonify({"error": err.messages}), status_code
+        REQUEST_COUNT.labels("/predict", "400").inc()
+        return jsonify({"error": err.messages}), 400
 
-    # 2️⃣  Pre-process & model inference
+    # 2️⃣  Pre-process & inference  – any error here is a real 500
     try:
         df         = pd.DataFrame([validated_data])
         preprocessor.fit(df)
@@ -61,24 +58,26 @@ def predict():
         prob       = model.predict_proba(processed)[0, 1]
         prediction = int(prob >= config.get_threshold())
 
-        # 3️⃣  Persist
-        with get_conn() as conn, conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO churn_predictions (customer_id, churn, probability)
-                VALUES (%s,%s,%s)
-                """,
-                (validated_data["customerID"], prediction, round(prob, 3)),
-            )
+        # 3️⃣  Best-effort DB insert
+        try:
+            with get_conn() as conn, conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO churn_predictions (customer_id, churn, probability)
+                    VALUES (%s,%s,%s)
+                    """,
+                    (validated_data["customerID"], prediction, round(prob, 3)),
+                )
+        except Exception as db_err:
+            app.logger.warning("DB insert failed: %s", db_err)
 
     except Exception as e:
-        status_code = 500
-        REQUEST_COUNT.labels("/predict", str(status_code)).inc()
-        return jsonify({"error": f"internal error: {e}"}), status_code
+        REQUEST_COUNT.labels("/predict", "500").inc()
+        return jsonify({"error": f"internal error: {e}"}), 500
 
     # 4️⃣  Success
-    REQUEST_COUNT.labels("/predict", str(status_code)).inc()
-    return jsonify({"prediction": prediction, "probability": round(prob, 3)}), status_code
+    REQUEST_COUNT.labels("/predict", "200").inc()
+    return jsonify({"prediction": prediction, "probability": round(prob, 3)}), 200
 
 
 if __name__ == "__main__":
