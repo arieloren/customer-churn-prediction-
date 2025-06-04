@@ -46,10 +46,18 @@ jobs:
             pg_isready -h postgres -p 5432 -U churn && break
             sleep 2
           done
+          # make vars available to the Python code 🐍
           echo "PGHOST=postgres"      >> $GITHUB_ENV
           echo "PGUSER=churn"         >> $GITHUB_ENV
           echo "PGPASSWORD=churn_pwd" >> $GITHUB_ENV
           echo "PGDATABASE=churn_db"  >> $GITHUB_ENV
+      # NEW – execute the SQL that creates churn_predictions & churn_input_data
+      - name: 🗄️ Run DB migration
+        run: |
+          psql -h postgres -U churn -d churn_db -f migrations/0001_init.sql
+        env:                          # psql also needs the password
+          PGPASSWORD: churn_pwd
+              
       - name: ✅ Run pytest
         run: pytest -q
 
