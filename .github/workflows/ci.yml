@@ -52,9 +52,9 @@ jobs:
           echo "PGPASSWORD=churn_pwd" >> $GITHUB_ENV
           echo "PGDATABASE=churn_db"  >> $GITHUB_ENV
       # NEW – execute the SQL that creates churn_predictions & churn_input_data
-      - name: 🗄️ Run DB migration
+      - name:  Run DB migration
         run: |
-          psql -h postgres -U churn -d churn_db -f migrations/0001_init.sql
+          psql -h 127.0.0.1 -U churn -d churn_db -f migrations/0001_init.sql
         env:                          # psql also needs the password
           PGPASSWORD: churn_pwd
               
