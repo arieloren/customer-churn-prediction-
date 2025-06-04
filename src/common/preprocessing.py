@@ -2,6 +2,7 @@ import pandas as pd
 import pickle
 from config.config_loader import Config
 import logging
+import numpy as np 
 class DataPreprocessor:
     def __init__(self, config: Config):
         self.config = config
