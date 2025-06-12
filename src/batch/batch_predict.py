@@ -29,11 +29,12 @@ ROWS_READ      = Gauge(
     "Number of rows fetched from churn_input_data",
     registry=REGISTRY,
 )
-ROWS_INSERTED  = Gauge(
-    "batch_rows_inserted_total",
+ROWS_WRITTEN = Gauge(
+    "batch_rows_written",
     "Number of rows written to churn_predictions",
-    registry=REGISTRY,
+    registry=REGISTRY
 )
+
 JOB_DURATION   = Histogram(
     "batch_job_seconds",
     "Total batch-run wall-time in seconds",
@@ -45,9 +46,18 @@ JOB_DURATION   = Histogram(
 # Helpers
 # ---------------------------------------------------------------------
 def fetch_input_data() -> pd.DataFrame:
-    """Pull raw feature rows that need scoring."""
+    """
+    Pull raw feature rows that need scoring.
+    Alias `customerid → customerID` so the rest of the pipeline
+    can keep using the camel-case column name.
+    """
     query = """
-        SELECT customerID, tenure, "TotalCharges", "Contract", "PhoneService"
+        SELECT
+            customerid      AS "customerID",   -- 👈 alias fixes the case
+            tenure,
+            "TotalCharges",
+            "Contract",
+            "PhoneService"
         FROM churn_input_data;
     """
     with get_conn() as conn:
@@ -58,6 +68,11 @@ def insert_predictions(df: pd.DataFrame) -> None:
     """Bulk-insert results into churn_predictions."""
     if df.empty:
         return
+
+    # 🔑  convert 0/1 → False/True so they match BOOLEAN
+    df = df.copy()
+    df["Prediction"] = df["Prediction"].astype(bool)
+
     with get_conn() as conn, conn.cursor() as cur:
         cur.executemany(
             """
@@ -66,7 +81,6 @@ def insert_predictions(df: pd.DataFrame) -> None:
             """,
             df[["customerID", "Prediction", "probability"]].values.tolist(),
         )
-
 
 # ---------------------------------------------------------------------
 # Main workflow
@@ -79,15 +93,39 @@ def main() -> None:
     raw = fetch_input_data()
     ROWS_READ.set(len(raw))
 
+
+    # 🔴 NEW — drop rows whose Contract is blank/null -----------------
+    bad_mask = raw["Contract"].isna() | (raw["Contract"].str.strip() == "")
+    if bad_mask.any():
+        n_bad = bad_mask.sum()
+        print(f"⚠️  Skipping {n_bad} row(s) with empty Contract")
+        # optional metric
+        SKIPPED = Gauge(
+            "batch_rows_skipped_total",
+            "Rows dropped because Contract was blank",
+            registry=REGISTRY,
+        )
+        SKIPPED.set(n_bad)
+        raw = raw[~bad_mask]
+    # -----------------------------------------------------------------
+    
     if raw.empty:
         print("ℹ️  No new rows – nothing to predict today")
         push_metrics()
         sys.exit(0)
 
+   
+
     # 2️⃣ Pre-process
     pre = DataPreprocessor(config)
     pre.fit(raw)
     processed = pre.transform(raw)
+
+    if processed.empty:
+        print("ℹ️  No valid rows after preprocessing – nothing to predict today")
+        push_metrics()
+        sys.exit(0)
+
 
     # 3️⃣ Predict
     model        = TransformModel(config)
@@ -96,7 +134,7 @@ def main() -> None:
 
     # 4️⃣ Insert
     insert_predictions(raw)
-    ROWS_INSERTED.set(len(raw))
+    ROWS_WRITTEN.set(len(raw))
     print(f"✅ Inserted {len(raw)} rows into churn_predictions")
 
     # 5️⃣ Push metrics
