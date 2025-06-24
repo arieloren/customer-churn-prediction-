@@ -1,6 +1,35 @@
 version: "3.9"
 
 services:
+
+  # ─────────────────────────────────────────────────────────
+  # 1️⃣  NEW – cAdvisor  (per-container CPU / MEM / NET / FS)
+  # ─────────────────────────────────────────────────────────
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor
+    restart: unless-stopped
+    ports: ["8080:8080"]
+    volumes:
+      - /:/rootfs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+
+  # ─────────────────────────────────────────────────────────
+  # 2️⃣  NEW – node-exporter (host-level CPU, RAM, Disk, etc.)
+  # ─────────────────────────────────────────────────────────
+  node-exporter:
+    image: prom/node-exporter:v1.8.1
+    container_name: node-exporter
+    network_mode: host         # expose on port 9100 without a mapped port
+    pid: host                  # lets exporter read /proc
+    restart: unless-stopped
+    command:
+      - '--path.rootfs=/host'
+    volumes:
+      - /:/host:ro
+
   # ----------------------------
   # Postgres - main application DB
   # ----------------------------
@@ -89,6 +118,8 @@ services:
       - "9090:9090"
     depends_on:
       - churn-api      # scrape API metrics
+      - cadvisor          # ⬅ so Prometheus waits for them on start-up
+      - node-exporter
 
   # ----------------------------
   # Grafana – dashboard frontend
