@@ -22,13 +22,14 @@ services:
   node-exporter:
     image: prom/node-exporter:v1.8.1
     container_name: node-exporter
-    network_mode: host         # expose on port 9100 without a mapped port
-    pid: host                  # lets exporter read /proc
     restart: unless-stopped
-    command:
-      - '--path.rootfs=/host'
+    ports:
+      - "9100:9100"        # mapping host→container
+    command: [ "--path.rootfs=/host" ]
     volumes:
       - /:/host:ro
+
+
 
   # ----------------------------
   # Postgres - main application DB
