@@ -1,7 +1,6 @@
 version: "3.9"
 
 services:
-
   # ─────────────────────────────────────────────────────────
   # 1️⃣  NEW – cAdvisor  (per-container CPU / MEM / NET / FS)
   # ─────────────────────────────────────────────────────────
@@ -23,16 +22,13 @@ services:
     image: prom/node-exporter:v1.8.1
     container_name: node-exporter
     restart: unless-stopped
-    ports:
-      - "9100:9100"        # mapping host→container
+    ports: ["9100:9100"]
     command: [ "--path.rootfs=/host" ]
     volumes:
       - /:/host:ro
 
-
-
   # ----------------------------
-  # Postgres - main application DB
+  # Postgres – main application DB
   # ----------------------------
   db:
     image: postgres:16-alpine
@@ -41,11 +37,10 @@ services:
       POSTGRES_USER: churn
       POSTGRES_PASSWORD: churn_pwd
       POSTGRES_DB: churn_db
-    ports:
-      - "5432:5432"        # optional – expose for psql / DBeaver
+    ports: ["5432:5432"]
     volumes:
-      - pgdata:/var/lib/postgresql/data          # <- database files
-      - ./migrations:/docker-entrypoint-initdb.d # <- ddl gets executed once
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
@@ -56,8 +51,7 @@ services:
   # REST API (Flask) – churn predictions
   # ----------------------------
   churn-api:
-    image: arieloren/churn-api:latest  
-    build:
+    build:                   # ← use build OR image, not both
       context: .
       dockerfile: src/api/Dockerfile-api
     container_name: churn-api
@@ -65,11 +59,9 @@ services:
       db:
         condition: service_healthy
     environment:
-      # Inject DB URI for SQL-alchemy or psycopg2 if you connect later
       DB_URI: postgresql://churn:churn_pwd@db:5432/churn_db
-      PYTHONUNBUFFERED: "1"    # nicer logs
-    ports:
-      - "9999:9999"
+      PYTHONUNBUFFERED: "1"
+    ports: ["9999:9999"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9999/predict"]
       interval: 20s
@@ -78,34 +70,35 @@ services:
 
   # ----------------------------
   # Batch runner – daily job image
-  # (no ports, executed on-demand or via scheduled GitHub Action)
   # ----------------------------
   batch-runner:
-    image: arieloren/churn-batch:latest   
-    build:
+    build:                   # ← again, pick build OR image
       context: .
       dockerfile: src/batch/Dockerfile-batch
-    volumes:
-      - ./data:/app/data
-      - ./outputs:/app/outputs
     container_name: churn-batch
     depends_on:
       db:
         condition: service_healthy
     environment:
       DB_URI: postgresql://churn:churn_pwd@db:5432/churn_db
-      PUSHGATEWAY_URL: pushgateway:9091 # Pushgateway URL for metrics
-    # no automatic run when compose starts; you’ll launch with:
-    #   docker compose run --rm batch-runner
-    entrypoint: []   # keep CMD from Dockerfile
+      PUSHGATEWAY_URL: pushgateway:9091
+    volumes:
+      - ./data:/app/data
+      - ./outputs:/app/outputs
+    entrypoint: []           # keep CMD from Dockerfile
 
   # ------------------------------------------------------------------
-  #   Prometheus Pushgateway
+  # Prometheus Pushgateway
   # ------------------------------------------------------------------
   pushgateway:
     image: prom/pushgateway:v1.8.0
     container_name: pushgateway
     ports: ["9091:9091"]
+    volumes:
+      - pgwdata:/data
+    command:
+      - "--web.enable-admin-api"
+      - "--persistence.file=/data/metrics"
 
   # ----------------------------
   # Prometheus – metrics scraper
@@ -115,12 +108,12 @@ services:
     container_name: prometheus
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    ports:
-      - "9090:9090"
+    ports: ["9090:9090"]
     depends_on:
-      - churn-api      # scrape API metrics
-      - cadvisor          # ⬅ so Prometheus waits for them on start-up
+      - churn-api
+      - cadvisor
       - node-exporter
+      - pushgateway       # optional but useful
 
   # ----------------------------
   # Grafana – dashboard frontend
@@ -128,8 +121,7 @@ services:
   grafana:
     image: grafana/grafana-oss:11.0.0
     container_name: grafana
-    ports:
-      - "3000:3000"
+    ports: ["3000:3000"]
     volumes:
       - grafana-data:/var/lib/grafana
     depends_on:
@@ -138,3 +130,4 @@ services:
 volumes:
   pgdata:
   grafana-data:
+  pgwdata:
