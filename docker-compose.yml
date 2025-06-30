@@ -76,7 +76,7 @@ services:
     build:                   # ← again, pick build OR image
       context: .
       dockerfile: src/batch/Dockerfile-batch
-    image: arieloren/churn-api:latest 
+    image: arieloren/churn-batch:latest 
     container_name: churn-batch
     depends_on:
       db:
